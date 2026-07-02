@@ -1,0 +1,67 @@
+name: Release
+
+# 打 v* 标签即触发：构建、打 DMG、发 Release，并回写 Homebrew tap 里的 cask。
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # 允许用 GITHUB_TOKEN 创建 Release
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set app version to match tag
+        run: |
+          /usr/libexec/PlistBuddy \
+            -c "Set :CFBundleShortVersionString ${{ steps.version.outputs.version }}" \
+            Resources/Info.plist
+
+      - name: Run tests
+        run: swift test
+
+      - name: Build app bundle
+        run: bash Scripts/build.sh
+
+      - name: Create DMG
+        run: bash Scripts/create-dmg.sh
+
+      - name: Name versioned DMG and compute checksum
+        id: dmg
+        run: |
+          DMG="dist/DisplayToggle-${{ steps.version.outputs.version }}.dmg"
+          cp dist/DisplayToggle.dmg "$DMG"
+          echo "path=$DMG" >> "$GITHUB_OUTPUT"
+          echo "sha=$(shasum -a 256 "$DMG" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "${{ steps.dmg.outputs.path }}" \
+            --title "DisplayToggle ${{ steps.version.outputs.version }}" \
+            --notes "Install: \`brew install --cask nullne/tap/displaytoggle\`"
+
+      - name: Update Homebrew cask in nullne/homebrew-tap
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA="${{ steps.dmg.outputs.sha }}"
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/nullne/homebrew-tap.git" tap
+          CASK="tap/Casks/displaytoggle.rb"
+          sed -i '' -E "s/^  version \".*\"/  version \"${VERSION}\"/" "$CASK"
+          sed -i '' -E "s/^  sha256 \".*\"/  sha256 \"${SHA}\"/" "$CASK"
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "displaytoggle: update to ${VERSION}"
+          git push
