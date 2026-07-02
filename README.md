@@ -13,10 +13,14 @@ A tiny macOS menu-bar app to toggle displays on/off, keep the Mac awake (Caffein
 Via [Homebrew](https://brew.sh):
 
 ```sh
-brew install --cask --no-quarantine nullne/tap/displaytoggle
+brew install --cask nullne/tap/displaytoggle
 ```
 
-> `--no-quarantine` is needed because the app is ad-hoc signed (not notarized). Alternatively, install without it and right-click the app → **Open** the first time.
+> The app is ad-hoc signed (not notarized), so Gatekeeper will block it the first time. Either **right-click the app → Open** once, or clear the quarantine flag:
+>
+> ```sh
+> xattr -dr com.apple.quarantine /Applications/DisplayToggle.app
+> ```
 
 ## Build from source
 
