@@ -32,3 +32,16 @@ bash Scripts/create-dmg.sh      # produce dist/DisplayToggle.dmg
 ```
 
 Requires macOS 14+ and a Swift 5.10+ toolchain.
+
+## Releasing
+
+Releases are fully automated by GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)). To cut a release, just push a version tag:
+
+```sh
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+On a `v*` tag the workflow builds the app, packages `DisplayToggle-<version>.dmg`, publishes a GitHub Release with it, and updates the Homebrew cask in [`nullne/homebrew-tap`](https://github.com/nullne/homebrew-tap) (bumping `version` and `sha256`). Users then get it with `brew upgrade --cask displaytoggle`.
+
+The tap update requires a repo secret `TAP_GITHUB_TOKEN` — a fine-grained PAT with **Contents: read and write** on `nullne/homebrew-tap`.
